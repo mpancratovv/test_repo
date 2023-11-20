@@ -19,10 +19,11 @@ services:
     volumes:
       - jenkins_home:/var/jenkins_home
       - ./pipeline/jcasc.yml:/var/jenkins_home/jcasc.yml
+      - /var/run/docker.sock:/var/run/docker.sock 
     environment:
-      -  CASC_JENKINS_CONFIG=/var/jenkins_home/jcasc.yml  
+      - CASC_JENKINS_CONFIG=/var/jenkins_home/jcasc.yml
     networks:
-      - mynetwork
+      - mynetwork   
       
 networks:   
   mynetwork:

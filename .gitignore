@@ -1,3 +1,7 @@
 /.idea/
 /QAEngineer-Challenge.iml
 /node_modules/
+/tests/cypress/reports/
+/tests/cypress/cucumber-json/
+/tests/node_modules/
+/tests/reports/

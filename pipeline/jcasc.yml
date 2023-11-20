@@ -1,29 +1,77 @@
+tool:
+  nodejs:
+    installations:
+      - name: "NodeJS"
+        properties:
+          - installSource:
+              installers:
+                - nodeJSInstaller:
+                    id: "18.17.0" 
+
 jobs:
   - script: >
-      pipelineJob('build-and-test-webapp') {
+      pipelineJob('test-webapp') {
         definition {
           cps {
             script("""
-              pipeline {
-                  agent any
-                  stages {
-                      stage('Build') {
-                          steps {
-                              echo 'Building...'
-                          }
-                      }
-                      stage('Test') {
-                          steps {
-                              echo 'Testing...'
-                          }
-                      }
-                      stage('Deploy') {
-                          steps {
-                              echo 'Deploying...'
-                          }
-                      }
-                  }
-              }
+                pipeline {
+                    agent any
+                    tools {
+                        nodejs 'NodeJS'
+                    }
+                    options {
+                        ansiColor('xterm')
+                    }
+                    stages {
+                        stage('GitHub Pull') {
+                            steps {
+                                script {
+                                    def repoDir = 'test_repo'
+                                    
+                                    if (!fileExists(repoDir)) {
+                                        echo "Cloning the repository..."
+                                        sh "git clone https://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:x-oauth-basic@github.com/mpancratovv/test_repo.git ${repoDir}"
+                                    } else {
+                                        echo "Pulling latest changes..."
+                                        dir(repoDir) {
+                                            sh "git pull"
+                                            }
+                                    }
+                                }
+                            }
+                        }
+                        stage('Test') {
+                            steps {
+                                echo 'Testing...'
+                                dir('test_repo/tests') {
+                                    sh 'echo Running tests'
+                                    sh 'docker build -t my-cypress-image .'
+                                    sh 'docker run --name cypress-tests --net test_repo_mynetwork -w /e2e my-cypress-image npm test --browser chrome'
+                                }
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                          dir('test_repo/tests') {  
+                            echo 'Generating results...'
+                            sh 'npm install multiple-cucumber-html-reporter --save-dev'
+                            sh 'docker cp cypress-tests:/e2e/cypress/cucumber-json /var/jenkins_home/workspace/test-webapp/test_repo/tests/cypress/cucumber-json'
+                            sh 'docker rm cypress-tests'
+                            sh 'npm run generate-cucumber-report'
+                            publishHTML(target: [
+                              allowMissing: false,
+                              alwaysLinkToLastBuild: true,
+                              keepAll: true,
+                              reportDir: 'cypress/cucumber-json', 
+                              reportFiles: 'index.html', 
+                              reportName: "Cucumber Report"
+                           ])
+                           sh 'rm -r cypress/cucumber-json/*'
+                         }
+                        }
+                    }
+                }
             """)
             sandbox(true)
           }
