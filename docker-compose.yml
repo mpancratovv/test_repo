@@ -1,0 +1,31 @@
+version: '3.8'
+services:
+  webapp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    networks:
+      - mynetwork
+
+  jenkins:
+    build:
+      context: ./pipeline
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - ./pipeline/jcasc.yml:/var/jenkins_home/jcasc.yml
+    environment:
+      -  CASC_JENKINS_CONFIG=/var/jenkins_home/jcasc.yml  
+    networks:
+      - mynetwork
+      
+networks:   
+  mynetwork:
+
+volumes:
+  jenkins_home:
