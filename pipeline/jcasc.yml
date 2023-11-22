@@ -27,48 +27,88 @@ jobs:
                             steps {
                                 script {
                                     def repoDir = 'test_repo'
-                                    
                                     if (!fileExists(repoDir)) {
                                         echo "Cloning the repository..."
-                                        sh "git clone https://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:x-oauth-basic@github.com/mpancratovv/test_repo.git ${repoDir}"
+                                        sh "git clone https://github.com/mpancratovv/test_repo \${repoDir}"
                                     } else {
                                         echo "Pulling latest changes..."
                                         dir(repoDir) {
                                             sh "git pull"
-                                            }
+                                        }
                                     }
                                 }
                             }
                         }
-                        stage('Test') {
+                        stage('Build Docker Image') {
                             steps {
-                                echo 'Testing...'
                                 dir('test_repo/tests') {
-                                    sh 'echo Running tests'
+                                    sh 'echo Building Docker image...'
                                     sh 'docker build -t my-cypress-image .'
-                                    sh 'docker run --name cypress-tests --net test_repo_mynetwork -w /e2e my-cypress-image npm test --browser chrome'
+                                }
+                            }
+                        }
+                        stage('Run Tests in Parallel') {
+                            steps {
+                                script {
+                                    parallel(
+                                        'Cypress Test 1': {
+                                            dir('test_repo/tests') {
+                                                sh 'docker run --name cypress-tests-1 --net test_repo_mynetwork -w /e2e my-cypress-image npm test --spec cypress/e2e/features/add_dogs.feature --browser chrome'
+                                            }
+                                        },
+                                        'Cypress Test 2': {
+                                            dir('test_repo/tests') {
+                                                sh 'docker run --name cypress-tests-2 --net test_repo_mynetwork -w /e2e my-cypress-image npm test --spec cypress/e2e/features/delete_dogs.feature --browser chrome'
+                                            }
+                                        },
+                                        'Cypress Test 3': {
+                                            dir('test_repo/tests') {
+                                                sh 'docker run --name cypress-tests-3 --net test_repo_mynetwork -w /e2e my-cypress-image npm test --spec cypress/e2e/features/edit_dogs.feature --browser chrome'
+                                            }
+                                        },
+                                        'Cypress Test 4': {
+                                            dir('test_repo/tests') {
+                                                sh 'docker run --name cypress-tests-4 --net test_repo_mynetwork -w /e2e my-cypress-image npm test --spec cypress/e2e/features/fields_validation.feature --browser chrome'
+                                            }
+                                        },
+                                        'Cypress Test 5': {
+                                            dir('test_repo/tests') {
+                                                sh 'docker run --name cypress-tests-5 --net test_repo_mynetwork -w /e2e my-cypress-image npm test --spec cypress/e2e/features/home_page.feature --browser chrome'
+                                            }
+                                        }
+                                    )
                                 }
                             }
                         }
                     }
                     post {
                         always {
-                          dir('test_repo/tests') {  
-                            echo 'Generating results...'
-                            sh 'npm install multiple-cucumber-html-reporter --save-dev'
-                            sh 'docker cp cypress-tests:/e2e/cypress/cucumber-json /var/jenkins_home/workspace/test-webapp/test_repo/tests/cypress/cucumber-json'
-                            sh 'docker rm cypress-tests'
-                            sh 'npm run generate-cucumber-report'
-                            publishHTML(target: [
-                              allowMissing: false,
-                              alwaysLinkToLastBuild: true,
-                              keepAll: true,
-                              reportDir: 'cypress/cucumber-json', 
-                              reportFiles: 'index.html', 
-                              reportName: "Cucumber Report"
-                           ])
-                           sh 'rm -r cypress/cucumber-json/*'
-                         }
+                            dir('test_repo/tests') {
+                                echo 'Generating results...'
+                                sh 'npm install multiple-cucumber-html-reporter --save-dev'
+                                
+                                sh 'docker cp cypress-tests-1:/e2e/cypress/cucumber-json /var/jenkins_home/workspace/test-webapp/test_repo/tests/cypress/cucumber-json'
+                                sh 'docker rm cypress-tests-1'
+                                sh 'docker cp cypress-tests-2:/e2e/cypress/cucumber-json /var/jenkins_home/workspace/test-webapp/test_repo/tests/cypress/cucumber-json'
+                                sh 'docker rm cypress-tests-2'
+                                sh 'docker cp cypress-tests-3:/e2e/cypress/cucumber-json /var/jenkins_home/workspace/test-webapp/test_repo/tests/cypress/cucumber-json'
+                                sh 'docker rm cypress-tests-3'
+                                sh 'docker cp cypress-tests-4:/e2e/cypress/cucumber-json /var/jenkins_home/workspace/test-webapp/test_repo/tests/cypress/cucumber-json'
+                                sh 'docker rm cypress-tests-4'
+                                sh 'docker cp cypress-tests-5:/e2e/cypress/cucumber-json /var/jenkins_home/workspace/test-webapp/test_repo/tests/cypress/cucumber-json'
+                                sh 'docker rm cypress-tests-5'
+                                
+                                sh 'npm run generate-cucumber-report'
+                                publishHTML(target: [
+                                    allowMissing: false,
+                                    alwaysLinkToLastBuild: true,
+                                    keepAll: true,
+                                    reportDir: 'cypress/cucumber-json', 
+                                    reportFiles: 'index.html', 
+                                    reportName: "Cucumber Report"
+                                ])
+                                sh 'rm -r cypress/cucumber-json/*'
+                            }
                         }
                     }
                 }
